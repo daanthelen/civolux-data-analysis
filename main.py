@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
   logger.info('Starting up FastAPI service...')
   start_time = time.time()
 
-  data_dir = Path('Heerlen_dataset.csv')
+  data_dir = Path('datasets/Heerlen_dataset.csv')
   if data_dir.exists():
     success = await dataset_manager.load_dataset_on_startup(data_dir)
     if not success:
@@ -50,7 +50,6 @@ app.add_middleware(
 async def health_check():
   return {
     "status": "healthy",
-    "service": "Python FastAPI Data Service",
     "dataset_loaded": dataset_manager.dataset is not None  
   }
 
