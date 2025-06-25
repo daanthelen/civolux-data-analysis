@@ -54,14 +54,28 @@ class DataAnalysisEngine:
     except Exception as e:
       logger.error(e, exc_info=True)
       raise
-  
-  def _predict_lifespan(self, building_type: str):
-      if building_type in ['Appartement', 'Tussenwoning', 'Hoekwoning', 'Vrijstaande woning', 'Woonhuis']:
-        return 75
-      elif building_type in ['Kantoor', 'Winkel', 'Bedrijfspand']:
-        return 50
-      else:
-        return 60
+
+  def predict_twins(self, df: pd.DataFrame, address: Address):
+    try:
+      df_prepared = data_preparation_engine.prepare_for_twin_prediction(df)
+
+      referenced_building = data_preparation_engine.construct_building(df_prepared, address)
+
+      twins = self._find_twins(df, referenced_building, 5, 0.1)
+
+      if twins.empty:
+        raise Exception("No twin buildings found.")
+      
+      twins = twins.apply(data_preparation_engine.construct_twin_building, axis=1).tolist()
+      return twins
+    
+    except KeyError as e:
+      error_message = f'Could not find column {e} in dataset.'
+      logger.error(error_message)
+      raise
+    except Exception as e:
+      logger.error(e, exc_info=True)
+      raise
   
   def _run_rfc(self, df: pd.DataFrame) -> RandomForestClassifier:
     logger.info("Applying RandomForestClassifier")
@@ -107,5 +121,20 @@ class DataAnalysisEngine:
       return {"error": str(e)}
 
     return pred, prob
+  
+  def _find_twins(self, df: pd.DataFrame, building: Building, years_tolerance: int, area_tolerance):
+    logger.info(f"Finding twins for building: {building}")
+
+    query = (
+      (df['pand_id'] != building.id) &
+      (abs(df['bouwjaar'] - building.build_year) <= years_tolerance) &
+      (abs(df['opp_pand'] - building.area) / building.area <= area_tolerance) &
+      (df['woningtype'] == building.building_type) &
+      (df['woonfunctie'] == building.has_residential_func) &
+      (df['kantoorfunctie'] == building.has_office_func) &
+      (df['winkelfunctie'] == building.has_shop_func)
+    )
+
+    return df[query]
 
 analysis_engine = DataAnalysisEngine()

@@ -1,7 +1,7 @@
 import pandas as pd
 import logging
 from datetime import datetime
-from models import Address, Building, ClusterPrediction, DemolishPrediction
+from models import Address, Building, ClusterPrediction, DemolishPrediction, TwinBuilding
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,12 @@ class DataPreparationEngine:
 
     return df_prepared
   
+  def prepare_for_twin_prediction(self, df: pd.DataFrame):
+    logger.info('Preparing dataset for twin prediction')
+
+    df_prepared = df.dropna(subset=['bouwjaar', 'opp_pand', 'lon', 'lat'])
+
+    return df_prepared
 
   def construct_building(self, df: pd.DataFrame, address: Address) -> Building:
     logger.info(f"Constructing building object for address: {address}")
@@ -110,6 +116,15 @@ class DataPreparationEngine:
       build_year=row['bouwjaar'],
       age=row['leeftijd'],
       cluster=row['cluster']
+    )
+  
+  def construct_twin_building(self, row: pd.Series) -> TwinBuilding:
+    return TwinBuilding(
+      longitude=row['lon'],
+      latitude=row['lat'],
+      build_year=row['bouwjaar'],
+      area=row['opp_pand'],
+      building_type=row['woningtype']
     )
   
   def _predict_lifespan(self, building_type: str):

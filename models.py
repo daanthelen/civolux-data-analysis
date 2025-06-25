@@ -48,3 +48,10 @@ class ClusterPrediction(BaseModel):
   build_year: int
   age: int
   cluster: int
+
+class TwinBuilding(BaseModel):
+  longitude: float
+  latitude: float
+  build_year: int
+  area: float
+  building_type: str

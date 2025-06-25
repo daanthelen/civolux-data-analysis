@@ -91,6 +91,25 @@ async def cluster():
     logger.error(f"Error in clustering algorithm: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
   
+@app.post('/predict_twins')
+async def predict_twins(address: Address):
+  try:
+    logger.info(f"Starting twin prediction")
+
+    df = dataset_manager.get_dataset()
+    if df is None:
+      raise HTTPException(status_code=404, detail="Dataset not found")
+
+    twin_result = analysis_engine.predict_twins(df, address)
+
+    return twin_result
+
+  except HTTPException:
+    raise
+  except Exception as e:
+    logger.error(f"Error in twin prediction: {str(e)}")
+    raise HTTPException(status_code=500, detail=str(e))
+  
 if __name__ == "__main__":
   uvicorn.run(
     "main:app",
