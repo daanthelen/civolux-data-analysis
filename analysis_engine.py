@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 class DataAnalysisEngine:
   def predict_demolish(self, df: pd.DataFrame, address: Address) -> DemolishPrediction:
     try:
-      df_prepared = data_preparation_engine.prepare_for_demolition_prediction(df)
+      model = self._run_rfc(df)
 
-      model = self._run_rfc(df_prepared)
+      building = data_preparation_engine.construct_building(df, address)
 
-      building = data_preparation_engine.construct_building(df_prepared, address)
+      if building is None:
+        raise Exception("Address not found.")
 
-      pred, prob = self._make_prediction(model, building)
+      pred, prob = self._calculate_demolish_prob(model, building)
 
     except KeyError as e:
       error_message = f'Could not find column {e} in dataset.'
@@ -29,19 +30,8 @@ class DataAnalysisEngine:
     except Exception as e:
       logger.error(e, exc_info=True)
       raise
-    
-    return DemolishPrediction(
-      address=f"{address.street} {address.house_number}{address.house_number_addition}",
-      build_year=building.build_year,
-      building_type=building.building_type,
-      age=building.age,
-      relative_age=round(building.relative_age * 100, 2),
-      predicted_lifespan=building.predicted_lifespan,
-      area=building.area,
-      area_ratio=building.area_ratio,
-      prediction=pred,
-      demolition_probability=round(prob * 100, 2)
-    )
+
+    return data_preparation_engine.construct_demolish_prediction(building, address, pred, prob)
   
   def predict_clusters(self, df: pd.DataFrame) -> List[ClusterPrediction]:
     try:
@@ -91,7 +81,7 @@ class DataAnalysisEngine:
 
     return model
   
-  def _make_prediction(self, model: RandomForestClassifier, building: Building):
+  def _calculate_demolish_prob(self, model: RandomForestClassifier, building: Building):
     logger.info(f"Making prediction for building: {building}")
 
     try:

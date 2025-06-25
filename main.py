@@ -54,7 +54,7 @@ async def health_check():
   }
 
 @app.post("/predict_demolish")
-async def predictDemolish(address: Address):
+async def predict_demolish(address: Address):
   try:
     logger.info(f"Predicting demolition for address: {address}")
 

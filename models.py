@@ -17,6 +17,7 @@ class Address(BaseModel):
     return v.strip().lower() if v else ''
 
 class Building(BaseModel):
+  id: float
   build_year: int
   building_type: str
   building_type_idx: int
