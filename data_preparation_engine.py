@@ -79,6 +79,9 @@ class DataPreparationEngine:
       build_year=build_year,
       building_type=building_type,
       building_type_idx=building_type_encoded,
+      has_residential_func=bool(row['woonfunctie']),
+      has_office_func=bool(row['kantoorfunctie']),
+      has_shop_func=bool(row['winkelfunctie']),
       age=age,
       relative_age=relative_age,
       predicted_lifespan=lifespan,
@@ -102,7 +105,7 @@ class DataPreparationEngine:
   
   def construct_cluster_prediction(self, row: pd.Series) -> ClusterPrediction:
     return ClusterPrediction(
-      longtitude=row['lon'],
+      longitude=row['lon'],
       latitude=row['lat'],
       build_year=row['bouwjaar'],
       age=row['leeftijd'],

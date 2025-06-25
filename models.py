@@ -14,13 +14,16 @@ class Address(BaseModel):
   @field_validator('house_number_addition')
   @classmethod
   def set_house_number_addition(cls, v: str = '') -> str:
-    return v.strip().lower() if v else ''
+    return v.strip().upper() if v else ''
 
 class Building(BaseModel):
   id: float
   build_year: int
   building_type: str
   building_type_idx: int
+  has_residential_func: bool
+  has_office_func: bool
+  has_shop_func: bool
   age: int
   relative_age: float
   predicted_lifespan: int
@@ -40,7 +43,7 @@ class DemolishPrediction(BaseModel):
   demolition_probability: float
 
 class ClusterPrediction(BaseModel):
-  longtitude: float
+  longitude: float
   latitude: float
   build_year: int
   age: int
