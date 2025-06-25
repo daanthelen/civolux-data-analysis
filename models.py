@@ -37,3 +37,10 @@ class DemolishPrediction(BaseModel):
   area_ratio: float
   prediction: bool
   demolition_probability: float
+
+class ClusterPrediction(BaseModel):
+  longtitude: float
+  latitude: float
+  build_year: int
+  age: int
+  cluster: int

@@ -53,7 +53,7 @@ async def health_check():
     "dataset_loaded": dataset_manager.dataset is not None  
   }
 
-@app.post("/predict")
+@app.post("/predict_demolish")
 async def predictDemolish(address: Address):
   try:
     logger.info(f"Predicting demolition for address: {address}")
@@ -70,6 +70,25 @@ async def predictDemolish(address: Address):
     raise
   except Exception as e:
     logger.error(f"Error in demolish prediction: {str(e)}")
+    raise HTTPException(status_code=500, detail=str(e))
+  
+@app.get("/predict_cluster")
+async def cluster():
+  try:
+    logger.info(f"Starting clustering algorithm")
+
+    df = dataset_manager.get_dataset()
+    if df is None:
+      raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    cluster_result = analysis_engine.predict_clusters(df)
+
+    return cluster_result
+  
+  except HTTPException:
+    raise
+  except Exception as e:
+    logger.error(f"Error in clustering algorithm: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
   
 if __name__ == "__main__":
