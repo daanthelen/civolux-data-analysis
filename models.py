@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Optional, List
 
 class Address(BaseModel):
   street: str
@@ -17,7 +17,9 @@ class Address(BaseModel):
     return v.strip().upper() if v else ''
 
 class Building(BaseModel):
-  id: float
+  id: str
+  longitude: float
+  latitude: float
   build_year: int
   building_type: str
   building_type_idx: int
@@ -50,6 +52,7 @@ class ClusterPrediction(BaseModel):
   cluster: int
 
 class TwinBuilding(BaseModel):
+  id: str
   longitude: float
   latitude: float
   build_year: int

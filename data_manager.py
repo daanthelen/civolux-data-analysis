@@ -1,6 +1,7 @@
 import pandas as pd
 import logging
 import asyncio
+import functools
 
 from data_preparation_engine import data_preparation_engine
 
@@ -14,8 +15,9 @@ class DatasetManager:
     try:
       logger.info(f"Loading dataset from {file_path}")
 
-      loop = asyncio.get_event_loop()
-      dataset = await loop.run_in_executor(None, pd.read_csv, file_path)
+      loop = asyncio.get_running_loop()
+      read_dataset = functools.partial(pd.read_csv, file_path, dtype={'pand_id': str})
+      dataset = await loop.run_in_executor(None, read_dataset)
       self.dataset = data_preparation_engine.prepare_dataset(dataset)
       logger.info(f"Successfully loaded dataset")
       return True

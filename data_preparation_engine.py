@@ -82,6 +82,8 @@ class DataPreparationEngine:
     
     return Building(
       id=row['pand_id'],
+      longitude=row['lon'],
+      latitude=row['lat'],
       build_year=build_year,
       building_type=building_type,
       building_type_idx=building_type_encoded,
@@ -120,6 +122,7 @@ class DataPreparationEngine:
   
   def construct_twin_building(self, row: pd.Series) -> TwinBuilding:
     return TwinBuilding(
+      id=row['pand_id'],
       longitude=row['lon'],
       latitude=row['lat'],
       build_year=row['bouwjaar'],
