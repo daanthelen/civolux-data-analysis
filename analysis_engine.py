@@ -4,7 +4,7 @@ import logging
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from models import Address, Building, DemolishPrediction, ClusterPrediction
+from models import Address, Building, DemolishPrediction, ClusterPrediction, TwinBuilding, TwinBuildingPrediction
 from typing import List
 
 from data_preparation_engine import data_preparation_engine
@@ -55,19 +55,32 @@ class DataAnalysisEngine:
       logger.error(e, exc_info=True)
       raise
 
-  def predict_twins(self, df: pd.DataFrame, address: Address):
+  def predict_twins(self, df: pd.DataFrame, address: Address) -> TwinBuildingPrediction:
     try:
       df_prepared = data_preparation_engine.prepare_for_twin_prediction(df)
 
-      referenced_building = data_preparation_engine.construct_building(df_prepared, address)
+      reference_building = data_preparation_engine.construct_building(df_prepared, address)
 
-      twins = self._find_twins(df, referenced_building, 5, 0.1)
+      twins = self._find_twins(df, reference_building, 5, 0.1)
 
       if twins.empty:
         raise Exception("No twin buildings found.")
       
       twins = twins.apply(data_preparation_engine.construct_twin_building, axis=1).tolist()
-      return twins
+
+      twin_building_prediction = TwinBuildingPrediction(
+        reference_building=TwinBuilding(
+          id=reference_building.id,
+          longitude=reference_building.longitude,
+          latitude=reference_building.latitude,
+          build_year=reference_building.build_year,
+          area=reference_building.area,
+          building_type=reference_building.building_type,
+        ),
+        twin_buildings=twins,
+      )
+      logger.info(twin_building_prediction)
+      return twin_building_prediction
     
     except KeyError as e:
       error_message = f'Could not find column {e} in dataset.'

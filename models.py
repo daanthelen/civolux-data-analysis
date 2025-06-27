@@ -55,3 +55,7 @@ class TwinBuilding(BaseModel):
   build_year: int
   area: float
   building_type: str
+
+class TwinBuildingPrediction(BaseModel):
+  reference_building: TwinBuilding
+  twin_buildings: List[TwinBuilding]
