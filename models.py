@@ -9,6 +9,9 @@ class Dataset(BaseModel):
   class Config:
     arbitrary_types_allowed = True
 
+class AddressSearchQuery(BaseModel):
+  searchQuery: str
+
 class Address(BaseModel):
   street: str
   house_number: int

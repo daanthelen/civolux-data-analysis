@@ -2,10 +2,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
-from models import Address
+from models import Address, AddressSearchQuery
 import uvicorn
 import time
+from typing import Set
 
 from data_manager import dataset_manager
 from analysis_engine import analysis_engine
@@ -50,6 +50,51 @@ async def health_check():
     "status": "healthy",
     "datasets_loaded": dataset_manager.datasets is not None  
   }
+
+@app.post("/addresses")
+async def get_addresses(address: AddressSearchQuery):
+  try:
+    logger.info('Retrieving all addresses')
+
+    df = dataset_manager.get_dataset('buildings')
+    if df is None:
+      raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    unique_addresses: Set[Address] = set()
+
+    df['huisnummer'] = df['huisnummer'].astype(str)
+    df['huisletter'] = df['huisletter'].fillna('')
+    df['adres'] = (
+      df['openbareruimtenaam'] + ' ' +
+      df['huisnummer'] +
+      df['huisletter']
+    )
+    df['adres'] = df['adres'].str.strip()
+
+    filtered_df = df[df['adres'].str.contains(address.searchQuery, case=False, na=False)]
+
+    for row in filtered_df.itertuples(index=False):
+      try:
+        address = Address(
+          street=row.openbareruimtenaam,
+          house_number=row.huisnummer,
+          house_number_addition=row.huisletter
+        )
+        unique_addresses.add(address)
+      except Exception as e:
+        logger.error(e)
+
+    addresses = list(unique_addresses)
+
+    return sorted(addresses, key=lambda addr: (addr.street, addr.house_number, addr.house_number_addition))
+  
+  except HTTPException:
+    raise
+  except KeyError as e:
+    raise HTTPException(status_code=500, detail=str(e))
+  except Exception as e:
+    logger.error(f"Error in demolish prediction: {str(e)}")
+    raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/predict_demolish")
 async def predict_demolish(address: Address):
