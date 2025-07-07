@@ -68,6 +68,8 @@ async def predict_demolish(address: Address):
   
   except HTTPException:
     raise
+  except KeyError as e:
+    raise HTTPException(status_code=500, detail=str(e))
   except Exception as e:
     logger.error(f"Error in demolish prediction: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
@@ -87,6 +89,8 @@ async def cluster():
   
   except HTTPException:
     raise
+  except KeyError as e:
+    raise HTTPException(status_code=500, detail=str(e))
   except Exception as e:
     logger.error(f"Error in clustering algorithm: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
@@ -106,6 +110,8 @@ async def predict_twins(address: Address):
 
   except HTTPException:
     raise
+  except KeyError as e:
+    raise HTTPException(status_code=500, detail=str(e))
   except Exception as e:
     logger.error(f"Error in twin prediction: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))

@@ -4,7 +4,7 @@ import logging
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from models import Address, Building, DemolishPrediction, ClusterPrediction, TwinBuilding, TwinBuildingPrediction
+from models import Address, Building, DemolishPrediction, BuildingResponse, TwinBuildingPrediction, Cluster
 from typing import List
 
 from data_preparation_engine import data_preparation_engine
@@ -26,14 +26,14 @@ class DataAnalysisEngine:
     except KeyError as e:
       error_message = f'Could not find column {e} in dataset.'
       logger.error(error_message)
-      raise
+      raise KeyError(error_message) from e
     except Exception as e:
       logger.error(e, exc_info=True)
       raise
 
     return data_preparation_engine.construct_demolish_prediction(building, address, pred, prob)
   
-  def predict_clusters(self, df: pd.DataFrame) -> List[ClusterPrediction]:
+  def predict_clusters(self, df: pd.DataFrame) -> List[Cluster]:
     try:
       df_prepared = data_preparation_engine.prepare_for_clustering(df)
 
@@ -44,13 +44,15 @@ class DataAnalysisEngine:
       kmeans = KMeans(n_clusters=5)
       df_prepared['cluster'] = kmeans.fit_predict(df_scaled)
 
-      clusters = df_prepared.apply(data_preparation_engine.construct_cluster_prediction, axis=1).tolist()
+      clusters_buildings = df_prepared.apply(data_preparation_engine.construct_cluster_building, axis=1).tolist()
+      clusters = data_preparation_engine.construct_cluster_prediction(clusters_buildings, df_prepared)
+
       return clusters
     
     except KeyError as e:
       error_message = f'Could not find column {e} in dataset.'
       logger.error(error_message)
-      raise
+      raise KeyError(error_message) from e
     except Exception as e:
       logger.error(e, exc_info=True)
       raise
@@ -61,18 +63,22 @@ class DataAnalysisEngine:
 
       reference_building = data_preparation_engine.construct_building(df_prepared, address)
 
-      twins = self._find_twins(df, reference_building, 5, 0.1)
+      if reference_building is None:
+        raise Exception("Address not found.")
+
+      twins = self._find_twins(df, reference_building, 3, 0.15)
 
       if twins.empty:
         raise Exception("No twin buildings found.")
       
-      twins = twins.apply(data_preparation_engine.construct_twin_building, axis=1).tolist()
+      twins = twins.apply(data_preparation_engine.construct_building_response, axis=1).tolist()
 
       twin_building_prediction = TwinBuildingPrediction(
-        reference_building=TwinBuilding(
+        reference_building=BuildingResponse(
           id=reference_building.id,
           longitude=reference_building.longitude,
           latitude=reference_building.latitude,
+          address=f"{address.street} {address.house_number}{address.house_number_addition}",
           build_year=reference_building.build_year,
           area=reference_building.area,
           building_type=reference_building.building_type,
@@ -85,7 +91,7 @@ class DataAnalysisEngine:
     except KeyError as e:
       error_message = f'Could not find column {e} in dataset.'
       logger.error(error_message)
-      raise
+      raise KeyError(error_message) from e
     except Exception as e:
       logger.error(e, exc_info=True)
       raise
