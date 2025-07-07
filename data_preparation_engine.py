@@ -1,7 +1,8 @@
 import pandas as pd
 import logging
 from datetime import datetime
-from models import Address, Building, ClusterPrediction, DemolishPrediction, TwinBuilding
+from models import Address, Building, DemolishPrediction, BuildingResponse, Cluster, ClusterBuilding
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +15,7 @@ class DataPreparationEngine:
 
     df['leeftijd'] = datetime.now().year - df['bouwjaar']
     
-    df['openbareruimtenaam'] = df['openbareruimtenaam'].astype(str).str.strip().str.lower()
-
+    df['openbareruimtenaam'] = df['openbareruimtenaam'].astype(str).str.strip()
     df['huisletter'] = df['huisletter'].fillna('').astype(str).str.strip().str.upper()
 
     df['levensduur'] = df['woningtype'].apply(self._predict_lifespan)
@@ -39,11 +39,13 @@ class DataPreparationEngine:
   def prepare_for_clustering(self, df: pd.DataFrame) -> pd.DataFrame:
     logger.info('Preparing dataset for clustering')
 
-    df_prepared = df[['lon', 'lat', 'bouwjaar', 'leeftijd']].dropna()
+    df.dropna(subset=['lon', 'lat', 'bouwjaar'], inplace=True)
+
+    df['leeftijd'] = datetime.now().year - df['bouwjaar']
 
     logger.info('Successfully prepared dataset')
 
-    return df_prepared
+    return df
   
   def prepare_for_twin_prediction(self, df: pd.DataFrame):
     logger.info('Preparing dataset for twin prediction')
@@ -57,7 +59,7 @@ class DataPreparationEngine:
 
     query = (
       (df['openbareruimtenaam'] == address.street) &
-      (df['huisnummer'] == address.house_number) &
+      (df['huisnummer'] == str(address.house_number)) &
       (df['huisletter'] == address.house_number_addition)
     )
 
@@ -86,9 +88,10 @@ class DataPreparationEngine:
       return {"error": error_message}
     
     return Building(
-      id=row['pand_id'],
+      id=row['uniq_key'],
       longitude=row['lon'],
       latitude=row['lat'],
+      address=address,
       build_year=build_year,
       building_type=building_type,
       building_type_idx=building_type_encoded,
@@ -116,20 +119,42 @@ class DataPreparationEngine:
       demolition_probability=round(prob * 100, 2)
     )
   
-  def construct_cluster_prediction(self, row: pd.Series) -> ClusterPrediction:
-    return ClusterPrediction(
-      longitude=row['lon'],
-      latitude=row['lat'],
-      build_year=row['bouwjaar'],
-      age=row['leeftijd'],
-      cluster=row['cluster']
+  def construct_cluster_building(self, row: pd.Series) -> ClusterBuilding:
+    building = self.construct_building_response(row)
+
+    return ClusterBuilding(
+      cluster=row['cluster'],
+      building=building
     )
   
-  def construct_twin_building(self, row: pd.Series) -> TwinBuilding:
-    return TwinBuilding(
-      id=row['pand_id'],
+  def construct_cluster_prediction(self, buildings: List[ClusterBuilding], df: pd.DataFrame) -> List[Cluster]:
+    clusters: List[Cluster] = []
+
+    average_cluster_ages = df.groupby('cluster')['leeftijd'].mean().round(1)
+
+    for building in buildings:
+      cluster = next((cluster for cluster in clusters if cluster.id == building.cluster), None)
+
+      if cluster:
+        cluster.buildings.append(building.building)
+      else:
+        new_cluster = Cluster(
+          id=building.cluster,
+          buildings=[building.building],
+          average_age=average_cluster_ages[building.cluster]
+        )
+
+        clusters.append(new_cluster)
+    
+    return clusters
+        
+  
+  def construct_building_response(self, row: pd.Series) -> BuildingResponse:
+    return BuildingResponse(
+      id=row['uniq_key'],
       longitude=row['lon'],
       latitude=row['lat'],
+      address=f"{row['openbareruimtenaam']} {row['huisnummer']}{row['huisletter']}",
       build_year=row['bouwjaar'],
       area=row['opp_pand'],
       building_type=row['woningtype']
