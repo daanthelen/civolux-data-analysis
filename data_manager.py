@@ -2,6 +2,8 @@ import pandas as pd
 import logging
 import asyncio
 import functools
+from typing import List
+from models import Dataset
 
 from data_preparation_engine import data_preparation_engine
 
@@ -9,28 +11,44 @@ logger = logging.getLogger(__name__)
 
 class DatasetManager:
   def __init__(self):
-    self.dataset: pd.DataFrame = None
+    self.datasets: List[Dataset] = []
   
-  async def load_dataset_on_startup(self, file_path: str) -> bool:
+  async def load_datasets_on_startup(self) -> bool:
     try:
-      logger.info(f"Loading dataset from {file_path}")
+      logger.info(f"Loading datasets")
 
       loop = asyncio.get_running_loop()
-      read_dataset = functools.partial(pd.read_csv, file_path, dtype={'pand_id': str})
-      dataset = await loop.run_in_executor(None, read_dataset)
-      self.dataset = data_preparation_engine.prepare_dataset(dataset)
-      logger.info(f"Successfully loaded dataset")
+      read_location_dataset = functools.partial(pd.read_csv, 'datasets/Heerlen_dataset.csv', dtype={'pand_id': str})
+      location_dataset = await loop.run_in_executor(None, read_location_dataset)
+
+      read_material_dataset = functools.partial(pd.read_csv, 'datasets/materialen.csv')
+      material_dataset = await loop.run_in_executor(None, read_material_dataset)
+
+      self.datasets.append(
+        Dataset (
+          name='buildings',
+          dataset=data_preparation_engine.prepare_buildings_dataset(location_dataset)
+        )
+      )
+      self.datasets.append(
+        Dataset (
+          name='materials',
+          dataset=material_dataset
+        )
+      )
+
+      logger.info(f"Successfully loaded datasets")
       return True
     
     except Exception as e:
       logger.error(f"Failed to load dataset: {str(e)}")
       return False
   
-  def get_dataset(self) -> pd.DataFrame:
-    return self.dataset
+  def get_dataset(self, name) -> pd.DataFrame:
+    return next((dataset.dataset for dataset in self.datasets if dataset.name == name), None)
   
   def clear_cache(self):
-    self.dataset = None
-    logger.info("Cleared dataset")
+    self.datasets = None
+    logger.info("Cleared datasets")
 
 dataset_manager = DatasetManager()

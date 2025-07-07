@@ -18,11 +18,9 @@ async def lifespan(app: FastAPI):
   logger.info('Starting up FastAPI service...')
   start_time = time.time()
 
-  data_dir = Path('datasets/Heerlen_dataset.csv')
-  if data_dir.exists():
-    success = await dataset_manager.load_dataset_on_startup(data_dir)
-    if not success:
-      logger.warning("Failed to load dataset")
+  success = await dataset_manager.load_datasets_on_startup()
+  if not success:
+    logger.warning("Failed to load dataset")
   
   logger.info(f"FastAPI service startup complete in {time.time() - start_time:.2f} seconds")
   yield
@@ -50,7 +48,7 @@ app.add_middleware(
 async def health_check():
   return {
     "status": "healthy",
-    "dataset_loaded": dataset_manager.dataset is not None  
+    "datasets_loaded": dataset_manager.datasets is not None  
   }
 
 @app.post("/predict_demolish")
@@ -58,7 +56,7 @@ async def predict_demolish(address: Address):
   try:
     logger.info(f"Predicting demolition for address: {address}")
 
-    df = dataset_manager.get_dataset()
+    df = dataset_manager.get_dataset('buildings')
     if df is None:
       raise HTTPException(status_code=404, detail="Dataset not found")
 
@@ -74,12 +72,12 @@ async def predict_demolish(address: Address):
     logger.error(f"Error in demolish prediction: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
   
-@app.get("/predict_cluster")
+@app.get("/predict_clusters")
 async def cluster():
   try:
     logger.info(f"Starting clustering algorithm")
 
-    df = dataset_manager.get_dataset()
+    df = dataset_manager.get_dataset('buildings')
     if df is None:
       raise HTTPException(status_code=404, detail="Dataset not found")
     
@@ -100,7 +98,7 @@ async def predict_twins(address: Address):
   try:
     logger.info(f"Starting twin prediction")
 
-    df = dataset_manager.get_dataset()
+    df = dataset_manager.get_dataset('buildings')
     if df is None:
       raise HTTPException(status_code=404, detail="Dataset not found")
 

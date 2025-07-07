@@ -1,5 +1,13 @@
 from pydantic import BaseModel, field_validator
 from typing import Optional, List
+import pandas as pd
+
+class Dataset(BaseModel):
+  name: str
+  dataset: pd.DataFrame
+
+  class Config:
+    arbitrary_types_allowed = True
 
 class Address(BaseModel):
   street: str

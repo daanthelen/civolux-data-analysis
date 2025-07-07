@@ -6,8 +6,8 @@ from models import Address, Building, ClusterPrediction, DemolishPrediction, Twi
 logger = logging.getLogger(__name__)
 
 class DataPreparationEngine:
-  def prepare_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
-    logger.info('Preparing dataset')
+  def prepare_buildings_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
+    logger.info('Preparing buildings dataset')
 
     # Gebouwen met woning type 'NULL' zijn geen verblijfsobjecten
     df['woningtype'] = df['woningtype'].fillna('Niet bewoonbaar')
@@ -30,6 +30,11 @@ class DataPreparationEngine:
     logger.info('Successfully prepared dataset')
 
     return df
+  
+  def prepare_materials_dataset(self, df: pd.DataFrame) -> pd.DataFrame:
+    logger.info('Preparing materials dataset')
+
+    df['functie'] = df['functie'].str.lower().str.strip()
   
   def prepare_for_clustering(self, df: pd.DataFrame) -> pd.DataFrame:
     logger.info('Preparing dataset for clustering')
