@@ -13,6 +13,8 @@ class DataPreparationEngine:
     # Gebouwen met woning type 'NULL' zijn geen verblijfsobjecten
     df['woningtype'] = df['woningtype'].fillna('Niet bewoonbaar')
 
+    df.dropna(subset=['bouwjaar'], inplace=True)
+
     df['leeftijd'] = datetime.now().year - df['bouwjaar']
     
     df['openbareruimtenaam'] = df['openbareruimtenaam'].astype(str).str.strip()
@@ -24,8 +26,34 @@ class DataPreparationEngine:
     df['pandstatus'] = df['pandstatus'].astype('category').cat.codes
     df['woningtype'] = df['woningtype'].astype('category')
     df['woningtype_categorie'] = df['woningtype'].cat.codes
-    
+  
     df['sloopkans'] = (df['bouwjaar'] < 1970).astype(int)
+
+    conditions = [
+      df['woonfunctie'] == 1,
+      df['celfunctie'] == 1,
+      df['gezondheidszorgfunctie'] == 1,
+      df['industriefunctie'] == 1,
+      df['kantoorfunctie'] == 1,
+      df['logiesfunctie'] == 1,
+      df['onderwijsfunctie'] == 1,
+      df['sportfunctie'] == 1,
+      df['winkelfunctie'] == 1,
+    ]
+
+    building_goals = [
+      'Woning',
+      'Gevangenis',
+      'Zorg',
+      'Industrie',
+      'Kantoor',
+      'Hotel',
+      'Onderwijs',
+      'Sporthal',
+      'Winkel',
+    ]
+
+    df['gebouw_doel'] = np.select(conditions, building_goals, default='Overig')
 
     logger.info('Successfully prepared dataset')
 
@@ -69,6 +97,9 @@ class DataPreparationEngine:
     
     row = match.iloc[0]
 
+    return self.construct_building_from_row(row)
+  
+  def construct_building_from_row(self, row: pd.Series) -> Building:
     build_year = int(row['bouwjaar'])
 
     building_type = row['woningtype']
@@ -80,12 +111,11 @@ class DataPreparationEngine:
     lifespan = self._predict_lifespan(building_type)
     relative_age = age / lifespan
 
-    try:
-      building_type_encoded = df['woningtype'].cat.categories.get_loc(building_type)
-    except KeyError:
-      error_message = f"Building type {building_type} is not a valid building type."
-      logger.error(error_message)
-      return {"error": error_message}
+    address = Address (
+      street=row['openbareruimtenaam'],
+      house_number=row['huisnummer'],
+      house_number_addition=row['huisletter']
+    )
     
     return Building(
       id=row['uniq_key'],
@@ -94,7 +124,7 @@ class DataPreparationEngine:
       address=address,
       build_year=build_year,
       building_type=building_type,
-      building_type_idx=building_type_encoded,
+      building_type_idx=row['woningtype_categorie'],
       has_residential_func=bool(row['woonfunctie']),
       has_office_func=bool(row['kantoorfunctie']),
       has_shop_func=bool(row['winkelfunctie']),

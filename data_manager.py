@@ -5,6 +5,7 @@ import functools
 from typing import List
 from models import Dataset
 
+from analysis_engine import analysis_engine
 from data_preparation_engine import data_preparation_engine
 
 logger = logging.getLogger(__name__)
@@ -18,16 +19,19 @@ class DatasetManager:
       logger.info(f"Loading datasets")
 
       loop = asyncio.get_running_loop()
-      read_location_dataset = functools.partial(pd.read_csv, 'datasets/Heerlen_dataset.csv', dtype={'pand_id': str})
-      location_dataset = await loop.run_in_executor(None, read_location_dataset)
+      read_buildings_dataset = functools.partial(pd.read_csv, 'datasets/Heerlen_dataset.csv', dtype={'pand_id': str})
+      buildings_dataset = await loop.run_in_executor(None, read_buildings_dataset)
 
       read_material_dataset = functools.partial(pd.read_csv, 'datasets/materialen.csv')
       material_dataset = await loop.run_in_executor(None, read_material_dataset)
 
+      buildings_dataset = data_preparation_engine.prepare_buildings_dataset(buildings_dataset)
+      buildings_dataset = analysis_engine.predict_demolitions_for_all_buildings(buildings_dataset)
+
       self.datasets.append(
         Dataset (
           name='buildings',
-          dataset=data_preparation_engine.prepare_buildings_dataset(location_dataset)
+          dataset=buildings_dataset
         )
       )
       self.datasets.append(

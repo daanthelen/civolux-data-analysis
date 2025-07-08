@@ -16,13 +16,23 @@ class DataAnalysisEngine:
     try:
       model = self._run_rfc(df)
 
-      building = data_preparation_engine.construct_building(df, address)
+      buildings = df.apply(data_preparation_engine.construct_building_from_row, axis=1).tolist()
 
-      if building is None:
-        raise Exception("Address not found.")
+      preds = []
+      probs = []
 
-      pred, prob = self._calculate_demolish_prob(model, building)
+      for building in buildings:
+        pred, prob = self._calculate_demolish_prob(model, building)
+        preds.append(pred)
+        probs.append(prob)
 
+      df['demolish_prediction'] = preds
+      df['demolish_probability'] = probs
+
+      logger.info('Successfully ran demolish predictions')
+
+      return df
+    
     except KeyError as e:
       error_message = f'Could not find column {e} in dataset.'
       logger.error(error_message)
@@ -30,8 +40,6 @@ class DataAnalysisEngine:
     except Exception as e:
       logger.error(e, exc_info=True)
       raise
-
-    return data_preparation_engine.construct_demolish_prediction(building, address, pred, prob)
   
   def predict_clusters(self, df: pd.DataFrame) -> List[Cluster]:
     try:
