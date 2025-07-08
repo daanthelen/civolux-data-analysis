@@ -1,7 +1,8 @@
 import pandas as pd
+import numpy as np
 import logging
 from datetime import datetime
-from models import Address, Building, DemolishPrediction, BuildingResponse, Cluster, ClusterBuilding
+from models import Address, Building, DemolishPrediction, BuildingResponse, Cluster, ClusterBuilding, Material
 from typing import List
 
 logger = logging.getLogger(__name__)
@@ -87,7 +88,7 @@ class DataPreparationEngine:
 
     query = (
       (df['openbareruimtenaam'] == address.street) &
-      (df['huisnummer'] == str(address.house_number)) &
+      (df['huisnummer'].astype(str) == str(address.house_number)) &
       (df['huisletter'] == address.house_number_addition)
     )
 
@@ -135,19 +136,72 @@ class DataPreparationEngine:
       area_ratio=float(row['verhouding_opp_vbo_opp_pnd'])
     )
   
-  def construct_demolish_prediction(self, building: Building, address: Address, pred: bool, prob: float) -> DemolishPrediction:
+  def construct_demolish_prediction(self, row: pd.Series, df_materials: pd.DataFrame) -> DemolishPrediction:
+    building = self.construct_building_from_row(row)
+
+    materials = self.get_materials(row, df_materials)
+
     return DemolishPrediction(
-      address=f"{address.street} {address.house_number}{address.house_number_addition}",
+      id=building.id,
+      longitude=building.longitude,
+      latitude=building.latitude,
+      address=f"{building.address.street} {building.address.house_number}{building.address.house_number_addition}",
       build_year=building.build_year,
+      area=building.area,
       building_type=building.building_type,
       age=building.age,
-      relative_age=round(building.relative_age * 100, 2),
+      relative_age=building.relative_age,
       predicted_lifespan=building.predicted_lifespan,
-      area=building.area,
       area_ratio=building.area_ratio,
-      prediction=pred,
-      demolition_probability=round(prob * 100, 2)
+      prediction=row['demolish_prediction'],
+      demolition_probability=row['demolish_probability'],
+      materials=materials
     )
+  
+  def get_materials(self, row: pd.Series, df_materials: pd.DataFrame) -> List[Material]:
+    woningtype = row['woningtype']
+
+    building_category = None
+    if woningtype.lower() == 'vrijstaande woning' or woningtype.lower() == 'tweeonder1kap':
+      building_category = 'vrijstaand'
+    elif woningtype.lower() == 'tussen of geschakelde woning' or woningtype.lower() == 'hoekwoning':
+      building_category = 'serieel'
+    elif woningtype.lower() == 'appartement':
+      building_category = 'appartement'
+
+    if building_category is None:
+      if row['winkelfunctie'] == 1:
+        building_category = 'winkel'
+      elif row['kantoorfunctie'] == 1:
+        building_category = 'kantoor'
+      elif row['industriefunctie'] == 1:
+        building_category = 'bedrijfshal'
+      elif row['gezondheidszorgfunctie'] == 1:
+        building_category = 'zorg'
+      elif row['onderwijsfunctie'] == 1:
+        building_category = 'onderwijs'
+    
+    if row['bouwjaar'] < 1945:
+        building_year_interval = '<1945'
+    elif 1945 <= row['bouwjaar'] <= 1970:
+        building_year_interval = '1945-1970'
+    elif 1970 < row['bouwjaar'] <= 2000:
+        building_year_interval = '1970-2000'
+    elif row['bouwjaar'] > 2000:
+        building_year_interval = '>2000'
+
+    materials = df_materials[
+      (df_materials['functie'] == building_category) &
+      (df_materials['bouwjaar'] == building_year_interval)
+    ]
+
+    if materials is None or materials.empty:
+      return []
+    
+    material_weights = materials.iloc[0].drop(['functie', 'bouwjaar']).astype(float)
+    calculated_materials = { Material(name=material, quantity=round(weight_per_m2 * row['opp_pand'], 2) if pd.notna(weight_per_m2) else 0) for material, weight_per_m2 in material_weights.items() }
+
+    return calculated_materials
   
   def construct_cluster_building(self, row: pd.Series) -> ClusterBuilding:
     building = self.construct_building_response(row)

@@ -4,15 +4,39 @@ import logging
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
-from models import Address, Building, DemolishPrediction, BuildingResponse, TwinBuildingPrediction, Cluster
+from models import Address, Building, DemolishPrediction, BuildingResponse, TwinBuildingPrediction, Cluster, MaterialTotal, Material
 from typing import List
+from collections import defaultdict
 
 from data_preparation_engine import data_preparation_engine
 
 logger = logging.getLogger(__name__)
 
 class DataAnalysisEngine:
-  def predict_demolish(self, df: pd.DataFrame, address: Address) -> DemolishPrediction:
+  def get_demolitions(self, df_buildings: pd.DataFrame, df_materials: pd.DataFrame) -> DemolishPrediction:
+    logger.info('Getting all demolitions')
+
+    try:
+      demolitions = df_buildings[df_buildings['demolish_probability'] >= 0.9]
+
+      if demolitions.empty:
+        return []
+
+      predictions = demolitions.apply(lambda row: data_preparation_engine.construct_demolish_prediction(row, df_materials), axis=1).tolist()
+
+      return predictions
+
+    except KeyError as e:
+      error_message = f'Could not find column {e} in dataset.'
+      logger.error(error_message)
+      raise KeyError(error_message) from e
+    except Exception as e:
+      logger.error(e, exc_info=True)
+      raise
+  
+  def predict_demolitions_for_all_buildings(self, df: pd.DataFrame) -> pd.DataFrame:
+    logger.info('Running demolish predictions for all buildings')
+
     try:
       model = self._run_rfc(df)
 
@@ -104,6 +128,35 @@ class DataAnalysisEngine:
       logger.error(e, exc_info=True)
       raise
   
+  def get_all_materials(self, df_buildings: pd.DataFrame, df_materials: pd.DataFrame) -> List[MaterialTotal]:
+    all_materials: List[Material] = []
+
+    for index, row in df_buildings.iterrows():
+      materials = data_preparation_engine.get_materials(row, df_materials)
+      all_materials.extend(materials)
+    
+    aggregated_materials = defaultdict(lambda: [0, 0])
+
+    for material in all_materials:
+      if material.quantity > 0:
+        aggregated_materials[material.name][0] += material.quantity
+        aggregated_materials[material.name][1] += 1
+    
+    total_materials: List[MaterialTotal] = []
+
+    for name, values in aggregated_materials.items():
+      total_quantity = values[0]
+      buildings_count = values[1]
+
+      material_total = MaterialTotal(
+        name=name,
+        quantity=total_quantity,
+        buildings=buildings_count
+      )
+      total_materials.append(material_total)
+
+    return total_materials    
+  
   def _run_rfc(self, df: pd.DataFrame) -> RandomForestClassifier:
     logger.info("Applying RandomForestClassifier")
 
@@ -112,7 +165,7 @@ class DataAnalysisEngine:
 
     try:
       model = RandomForestClassifier()
-      model.fit(X, y)
+      model.fit(X.values, y)
 
     except Exception as e:
       logger.error(f"Error in RandomForestClassifier: {str(e)}")
@@ -123,8 +176,6 @@ class DataAnalysisEngine:
     return model
   
   def _calculate_demolish_prob(self, model: RandomForestClassifier, building: Building):
-    logger.info(f"Making prediction for building: {building}")
-
     try:
       X_input = np.array([[
         building.build_year,
@@ -153,7 +204,7 @@ class DataAnalysisEngine:
     logger.info(f"Finding twins for building: {building}")
 
     query = (
-      (df['pand_id'] != building.id) &
+      (df['uniq_key'] != building.id) &
       (abs(df['bouwjaar'] - building.build_year) <= years_tolerance) &
       (abs(df['opp_pand'] - building.area) / building.area <= area_tolerance) &
       (df['woningtype'] == building.building_type) &

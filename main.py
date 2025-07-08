@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from contextlib import asynccontextmanager
@@ -71,7 +71,7 @@ async def get_addresses(address: AddressSearchQuery):
     )
     df['adres'] = df['adres'].str.strip()
 
-    filtered_df = df[df['adres'].str.contains(address.searchQuery, case=False, na=False)]
+    filtered_df = df[df['adres'].str.contains(address.address, case=False, na=False)]
 
     for row in filtered_df.itertuples(index=False):
       try:
@@ -93,22 +93,42 @@ async def get_addresses(address: AddressSearchQuery):
   except KeyError as e:
     raise HTTPException(status_code=500, detail=str(e))
   except Exception as e:
-    logger.error(f"Error in demolish prediction: {str(e)}")
+    logger.error(f"Error while searching for address: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/predict_demolish")
-async def predict_demolish(address: Address):
+  
+@app.get("/building_types")
+async def get_building_types():
   try:
-    logger.info(f"Predicting demolition for address: {address}")
+    logger.info('Retrieving all building types')
 
     df = dataset_manager.get_dataset('buildings')
     if df is None:
       raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    building_types = df['gebouw_doel'].unique()
 
-    demolition_prediction = analysis_engine.predict_demolish(df, address)
-
-    return demolition_prediction
+    return list(building_types)
   
+  except HTTPException:
+    raise
+  except KeyError as e:
+    raise HTTPException(status_code=500, detail=str(e))
+  except Exception as e:
+    logger.error(f"Error while retrieving all building types: {str(e)}")
+    raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/demolitions")
+async def get_demolitions():
+  try:
+    logger.info('Getting all demolitions')
+
+    df_buildings = dataset_manager.get_dataset('buildings')
+    df_materials = dataset_manager.get_dataset('materials')
+    if df_buildings is None or df_materials is None:
+      raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    return analysis_engine.get_demolitions(df_buildings, df_materials)
+    
   except HTTPException:
     raise
   except KeyError as e:
@@ -117,6 +137,28 @@ async def predict_demolish(address: Address):
     logger.error(f"Error in demolish prediction: {str(e)}")
     raise HTTPException(status_code=500, detail=str(e))
   
+@app.get('/materials')
+async def get_materials():
+  try:
+    logger.info('Getting all materials')
+
+    df_buildings = dataset_manager.get_dataset('buildings')
+    df_materials = dataset_manager.get_dataset('materials')
+    if df_buildings is None or df_materials is None:
+      raise HTTPException(status_code=404, detail="Dataset not found")
+    
+    total_materials = analysis_engine.get_all_materials(df_buildings, df_materials)
+
+    return total_materials
+    
+  except HTTPException:
+    raise
+  except KeyError as e:
+    raise HTTPException(status_code=500, detail=str(e))
+  except Exception as e:
+    logger.error(f"Error while calculating total materials: {str(e)}")
+    raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/predict_clusters")
 async def cluster():
   try:

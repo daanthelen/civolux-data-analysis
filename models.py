@@ -10,7 +10,10 @@ class Dataset(BaseModel):
     arbitrary_types_allowed = True
 
 class AddressSearchQuery(BaseModel):
-  searchQuery: str
+  address: str
+
+class BuildingTypeQuery(BaseModel):
+  building_type: str
 
 class Address(BaseModel):
   street: str
@@ -92,6 +95,15 @@ class Material(BaseModel):
   name: str
   quantity: int
 
+  class Config:
+    frozen = True
+
+class MaterialTotal(Material):
+  buildings: int
+
+class MaterialAnalysis(BaseModel):
+  total_materials: List[MaterialTotal]
+
 class DemolishPrediction(BuildingResponse):
   age: int
   relative_age: float
@@ -99,4 +111,4 @@ class DemolishPrediction(BuildingResponse):
   area_ratio: float
   prediction: bool
   demolition_probability: float
-  materials: List[Material]
+  materials: Optional[List[Material]] = []
